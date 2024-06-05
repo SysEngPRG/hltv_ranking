@@ -65,6 +65,7 @@ class Connection:
         options.add_experimental_option('excludeSwitches', ['enable-logging'])
         options.add_argument('--headless=new')
         options.add_argument('log-level=3')
+        options.add_argument('--no-sandbox')
         options.add_argument('--ignore-certificate-errors-spki-list')
         options.add_argument('--ignore-ssl-errors')
         options.add_argument('--disable-blink-features=AutomationControlled')
