@@ -1,9 +1,9 @@
 import csv
 import sys
-import atexit
+import os
 import time
+import json
 import asyncio
-import numpy as np
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service as ChromeService
@@ -12,13 +12,25 @@ from selenium.common.exceptions import WebDriverException
 import httplib2
 from googleapiclient.discovery import build
 from oauth2client.service_account import ServiceAccountCredentials
+import signal
+from types import FrameType
 
+
+class Config:
+    def __init__(self):
+        self.conf = "conf.json"
+    def read_conf(self):
+        with open (self.conf) as json_file:
+            self.conf_dict = json.load(json_file)
+            return self.conf_dict
 
 class Initial_mtx:
 
     def __init__(self):
+        conf_init = Config()
+        self.confObj = Config.read_conf(conf_init)       
         self.startMtx = []
-        self.file = "XPM_hltv_ranks.csv"
+        self.file = self.confObj["csv_schema"]
 
     def openFile(self):
         with open (self.file, encoding='utf-8') as csvFile:
@@ -41,8 +53,10 @@ class Values:
     colMtx = int(mtxObj[2])
     startMtx = mtxObj[0][0]
     resMtx = mtxObj[3]
-    tableId = "15QuoPJ-laB2Cr8hJvWJkEIBNR6KhTVhxKISzzPkcsvg"
-
+    tableId = initial.confObj["tableId"]
+    gsList = initial.confObj["gsList"]
+    page_link = initial.confObj["page_link"]
+    timeout = initial.confObj["timeout"]
 
 class Connection:
 
@@ -56,9 +70,8 @@ class Connection:
         options.add_argument('--disable-blink-features=AutomationControlled')
         return options
     browser = webdriver.Chrome(options = __init__())
-    page_link = "https://hltv-ranking.perch1.me"
-    browser.get(page_link)
-    browser.implicitly_wait(5)
+    browser.get(Values.page_link)
+    browser.implicitly_wait(4)
     print("Initializing...")    
 
 
@@ -109,6 +122,7 @@ class Handler:
     def __init__(self, count, curTime):
         self.count = count
         self.curTime = curTime
+        self.gsList = Values.gsList
     def catch(self):
         stArr = []
         tableId = Values.tableId
@@ -118,7 +132,7 @@ class Handler:
             bodyState = {
         'valueInputOption' : 'RAW',
         'data' : [
-        {'range' : 'test!K1', 'values' : [["Invalid_xPath"]]}
+        {'range' : f'{self.gsList}!B1', 'values' : [["Invalid_xPath"]]}
          ]
         }
             sendToTableState = GsBuild.get_service_sacc().spreadsheets().values().batchUpdate(spreadsheetId=tableId, body=bodyState).execute()
@@ -138,17 +152,19 @@ def __main__():
     st = statuses.catch()
     state.append(st[0])
     state.append(st[1])
+    gsList = Values.gsList
     bodyState = {
         'valueInputOption' : 'RAW',
         'data' : [
-         {'range' : 'test!J1', 'values' : state}
+         {'range' : f'{gsList}!A1', 'values' : state}
          ]
     }
+
     sendToTableState = GsBuild.get_service_sacc().spreadsheets().values().batchUpdate(spreadsheetId=tableId, body=bodyState).execute()
     body = {
         'valueInputOption' : 'RAW',
         'data' : [
-         {'range' : 'test!A1', 'values' : fillRes[0]}
+         {'range' : f'{gsList}!C1', 'values' : fillRes[0]}
             ]
     }
 
@@ -156,43 +172,57 @@ def __main__():
     return statuses
 
 def Isexit():
-    tableId = Values.tableId
+    gsList = Values.gsList
     state = []
     state.append(["STOPED"])
     bodyState = {
         'valueInputOption' : 'RAW',
         'data' : [
-         {'range' : 'test!J1', 'values' : state}
+         {'range' : f'{gsList}!A1', 'values' : state}
          ]
     }
     sendToTableState = GsBuild.get_service_sacc().spreadsheets().values().batchUpdate(spreadsheetId=Values.tableId, body=bodyState).execute()
     Connection.browser.quit()
+    sys.exit()
 
 
+class SigTerm(SystemExit):
+    pass
+
+def termination(signal: int, frame: FrameType) -> None:
+    raise SigTerm("Stoped")
+
+
+def task_handler(loop, context):
+    message = context['message']
+    pass
 
 async def run(interval):
+    signal.signal(signal.SIGTERM, termination)
     while True:
         await asyncio.sleep(interval)
         __main__()
-
+pid = os.getpid()
+print(f"PROCESS ID: {pid}")
 loop = asyncio.get_event_loop()
-atexit.register(Isexit)
+loop.create_task(run(Values.timeout))
+loop.set_exception_handler(task_handler)
+
+
 try:
-   loop.run_until_complete(run(20))
+    print("Init is done!")
+    loop.run_forever()
 except (KeyboardInterrupt, SystemExit):
-    loop.stop()
-    Isexit()
+    loop.run_until_complete(loop.shutdown_asyncgens())
+    loop.close()
     print("Cancelling")
+    Isexit()
 except WebDriverException as e:
     loop.stop()
     if 'connection refused' in str(e).lower():
         print("operation aborted")
         Isexit()
 finally:
-    loop.stop()
-    print("app was stopped")
+    loop.close()
+    print("Please wait, app is stopping...")
     Isexit()
-    sys.exit()
-
-
-  
