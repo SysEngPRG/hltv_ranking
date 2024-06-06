@@ -18,7 +18,7 @@ from types import FrameType
 
 class Config:
     def __init__(self):
-        self.conf = "./conf.json"
+        self.conf = "conf.json"
     def read_conf(self):
         with open (self.conf) as json_file:
             self.conf_dict = json.load(json_file)
