@@ -57,6 +57,7 @@ class Values:
     gsList = initial.confObj["gsList"]
     page_link = initial.confObj["page_link"]
     timeout = initial.confObj["timeout"]
+    deTimeout = False
 
 class Connection:
 
@@ -105,6 +106,7 @@ class Filler(Connection, Values):
                     self.errCount - 1
                     print("invalid xPath: ", xPath)
                     self.browser.implicitly_wait(3)
+                    pass
 
 
         return self.resMtx, self.errCount
@@ -130,6 +132,7 @@ class Handler:
         if self.count < (Values.rowMtx-1)*Values.colMtx:
             status1 = 'Data update failed'
             status2 = f"LAST UPDATE: {self.curTime}"
+            error = True
             bodyState = {
         'valueInputOption' : 'RAW',
         'data' : [
@@ -140,8 +143,17 @@ class Handler:
         else:
             status1 = 'Data update succesfull'
             status2 = f"LAST UPDATE: {self.curTime}"
+            error = False
+            bodyState = {
+        'valueInputOption' : 'RAW',
+        'data' : [
+        {'range' : f'{self.gsList}!B1', 'values' : [[""]]}
+         ]
+        }
+            sendToTableState = GsBuild.get_service_sacc().spreadsheets().values().batchUpdate(spreadsheetId=tableId, body=bodyState).execute()
         stArr.append([status1])
         stArr.append([status2])
+        stArr.append([error])
         return stArr    
 
 def __main__():
@@ -153,6 +165,7 @@ def __main__():
     st = statuses.catch()
     state.append(st[0])
     state.append(st[1])
+    isError = st[2]
     gsList = Values.gsList
     bodyState = {
         'valueInputOption' : 'RAW',
@@ -168,8 +181,11 @@ def __main__():
          {'range' : f'{gsList}!C1', 'values' : fillRes[0]}
             ]
     }
-
-    sendToTableData = GsBuild.get_service_sacc().spreadsheets().values().batchUpdate(spreadsheetId=tableId, body=body).execute()
+    if isError == False:
+        sendToTableData = GsBuild.get_service_sacc().spreadsheets().values().batchUpdate(spreadsheetId=tableId, body=body).execute()
+        Values.deTimeout = False
+    else:
+        Values.deTimeout = True
     return statuses
 
 def Isexit():
@@ -201,12 +217,13 @@ def task_handler(loop, context):
 async def run(interval):
     signal.signal(signal.SIGTERM, termination)
     while True:
-        await asyncio.sleep(interval)
         __main__()
+        await asyncio.sleep(interval)
 pid = os.getpid()
 print(f"PROCESS ID: {pid}")
 loop = asyncio.get_event_loop()
-loop.create_task(run(Values.timeout))
+timeout_var = Values.timeout if Values.deTimeout == False else 5
+loop.create_task(run(timeout_var))
 loop.set_exception_handler(task_handler)
 
 
