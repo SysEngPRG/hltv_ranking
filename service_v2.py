@@ -58,6 +58,7 @@ class Values:
     page_link = initial.confObj["page_link"]
     timeout = initial.confObj["timeout"]
     deTimeout = False
+    lastSuccessTime = ""
 
 class Connection:
 
@@ -121,7 +122,6 @@ class GsBuild(Values):
         return build('sheets', 'v4', http=creds_service)
 
 class Handler:
-    #curTime = time.strftime("%H:%M:%S")
     def __init__(self, count, curTime):
         self.count = count
         self.curTime = curTime
@@ -131,7 +131,7 @@ class Handler:
         tableId = Values.tableId
         if self.count < (Values.rowMtx-1)*Values.colMtx:
             status1 = 'Data update failed'
-            status2 = f"LAST UPDATE: {self.curTime}"
+            status2 = Values.lastSuccessTime
             error = True
             bodyState = {
         'valueInputOption' : 'RAW',
@@ -144,6 +144,7 @@ class Handler:
             status1 = 'Data update succesfull'
             status2 = f"LAST UPDATE: {self.curTime}"
             error = False
+            Values.lastSuccessTime = status2
             bodyState = {
         'valueInputOption' : 'RAW',
         'data' : [
