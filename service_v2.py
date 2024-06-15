@@ -90,6 +90,8 @@ class Filler(Connection, Values):
     def getElements(self, row, col, xPath, browser):	
         if xPath != "":		
             parseVal  =  browser.find_element(By.XPATH, xPath).text
+            if parseVal == "" and browser.find_element(By.XPATH, xPath).tag_name == 'img':
+                parseVal  =  browser.find_element(By.XPATH, xPath).get_attribute('alt')
         else:
             parseVal = ""
         self.resMtx[row][col] = parseVal
@@ -154,7 +156,7 @@ class Handler:
             sendToTableState = GsBuild.get_service_sacc().spreadsheets().values().batchUpdate(spreadsheetId=tableId, body=bodyState).execute()
         stArr.append([status1])
         stArr.append([status2])
-        stArr.append([error])
+        stArr.append(error)
         return stArr    
 
 def __main__():
